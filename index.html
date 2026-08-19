@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>快樂獅背單字</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Nunito:wght@500;700;800&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#FFF9EC;
+    --card:#FFFFFF;
+    --ink:#4A3728;
+    --ink-soft:#8A7A68;
+    --gold:#F5A623;
+    --gold-deep:#D9860A;
+    --sky:#4FB4DE;
+    --sky-deep:#2F93C0;
+    --grass:#5FB86A;
+    --coral:#E8604C;
+    --line:#F0E4D0;
+    --radius:22px;
+    --shadow: 0 10px 30px rgba(74,55,34,0.10);
+  }
+  * { box-sizing: border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background: var(--cream);
+    background-image:
+      radial-gradient(circle at 8% 12%, rgba(245,166,35,0.10) 0, transparent 40%),
+      radial-gradient(circle at 92% 85%, rgba(79,180,222,0.12) 0, transparent 42%);
+    color: var(--ink);
+    font-family: 'Nunito', 'Noto Sans TC', sans-serif;
+    min-height:100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1,h2,h3, .display{
+    font-family: 'Baloo 2', 'Noto Sans TC', sans-serif;
+    font-weight: 800;
+  }
+  .app{
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 20px 18px 60px;
+    min-height: 100%;
+  }
+  .screen{ display:none; }
+  .screen.active{ display:block; animation: rise .35s ease; }
+  @keyframes rise{ from{opacity:0; transform: translateY(10px);} to{opacity:1; transform:none;} }
+
+  /* ---------- Header / brand ---------- */
+  .brandbar{
+    display:flex; align-items:center; gap:12px;
+    margin-bottom: 18px;
+  }
+  .brandbar .mark{ width:44px; height:44px; flex:none; }
+  .brandbar .name{ font-size: 22px; letter-spacing: .3px; }
+  .brandbar .sub{ color:var(--ink-soft); font-size:13px; font-weight:700; margin-top:-2px; }
+  .gear{
+    margin-left:auto; width:38px; height:38px; border-radius:50%;
+    border:2px solid var(--line); background:var(--card); cursor:pointer;
+    display:flex; align-items:center; justify-content:center; font-size:18px;
+  }
+
+  /* ---------- Card ---------- */
+  .card{
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 22px;
+    margin-bottom: 16px;
+    border: 1px solid var(--line);
+  }
+  .field{ margin-bottom: 16px; }
+  .field label{ display:block; font-weight:800; margin-bottom:8px; font-size:14px; color: var(--ink); }
+  .hint{ color:var(--ink-soft); font-size:12.5px; margin-top:6px; line-height:1.5; }
+  input[type=text], input[type=url], select{
+    width:100%; padding:13px 14px; border-radius:14px;
+    border:2px solid var(--line); font-size:16px; font-family:inherit;
+    background:#FFFDF8; color:var(--ink);
+  }
+  input:focus, select:focus{ outline:none; border-color: var(--gold); }
+
+  .chip-row{ display:flex; flex-wrap:wrap; gap:10px; }
+  .chip{
+    border:2px solid var(--line); background:#FFFDF8; border-radius:14px;
+    padding:12px 16px; font-weight:800; cursor:pointer; font-size:15px;
+    display:flex; align-items:center; gap:8px; user-select:none;
+    transition: all .15s ease;
+  }
+  .chip.selected{ border-color: var(--gold); background: #FFF3DC; color: var(--gold-deep); }
+  .chip .dot{ width:9px; height:9px; border-radius:50%; background:var(--line); }
+  .chip.selected .dot{ background: var(--gold); }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    border:none; border-radius:16px; padding:15px 22px; font-family:inherit;
+    font-weight:800; font-size:16px; cursor:pointer; width:100%;
+    box-shadow: 0 6px 0 rgba(0,0,0,0.08);
+    transition: transform .08s ease;
+  }
+  .btn:active{ transform: translateY(3px); box-shadow:0 2px 0 rgba(0,0,0,0.08); }
+  .btn-primary{ background: linear-gradient(180deg, #FFC059, var(--gold)); color:#5A3300; }
+  .btn-secondary{ background: linear-gradient(180deg, #7FD0EE, var(--sky)); color:#043043; }
+  .btn-ghost{ background: var(--card); color:var(--ink); border:2px solid var(--line); box-shadow:none; }
+  .btn-ghost:active{ transform:none; }
+  .btn[disabled]{ opacity:.45; pointer-events:none; }
+
+  .row2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+
+  /* ---------- Lion mascot ---------- */
+  .mascot-wrap{ display:flex; justify-content:center; margin: 6px 0 14px; }
+  .mascot{ position:relative; width:150px; height:150px; }
+  .mascot svg{ width:100%; height:100%; display:block; }
+  .spike{ transform-origin: 75px 75px; transition: opacity .25s ease, transform .3s cubic-bezier(.34,1.56,.64,1); }
+
+  /* ---------- Quiz screen ---------- */
+  .progresswrap{ display:flex; align-items:center; gap:10px; margin-bottom: 10px; }
+  .progressbar{ flex:1; height:10px; border-radius:6px; background:var(--line); overflow:hidden; }
+  .progressbar > i{ display:block; height:100%; background: linear-gradient(90deg, var(--gold), var(--sky)); width:0%; transition: width .3s ease; }
+  .progresstxt{ font-weight:800; color:var(--ink-soft); font-size:13px; white-space:nowrap; }
+
+  .unit-tag{
+    display:inline-block; background:#EAF7FB; color: var(--sky-deep);
+    font-weight:800; font-size:12.5px; padding:5px 11px; border-radius:999px; margin-bottom:10px;
+  }
+  .cn-word{
+    font-family:'Noto Sans TC', sans-serif; font-weight:900;
+    font-size: clamp(34px, 9vw, 52px); text-align:center; margin: 6px 0 4px; line-height:1.25;
+  }
+  .quiz-input-row{ display:flex; gap:10px; margin-top:16px; }
+  .quiz-input-row input{
+    flex:1; text-align:center; font-size:22px; font-weight:800;
+    font-family:'Baloo 2', sans-serif; letter-spacing:1px;
+  }
+  .quiz-input-row input.wrong-flash{ border-color: var(--coral); animation: shake .3s; }
+  .quiz-input-row input.right-flash{ border-color: var(--grass); }
+  @keyframes shake{ 0%,100%{transform:translateX(0);} 25%{transform:translateX(-6px);} 75%{transform:translateX(6px);} }
+
+  .feedback{
+    margin-top:14px; border-radius:16px; padding:14px 16px; font-weight:700; font-size:15px;
+    display:none;
+  }
+  .feedback.show{ display:block; animation: rise .25s ease; }
+  .feedback.ok{ background:#EAF8EC; color:#1F6B2B; }
+  .feedback.bad{ background:#FDEDEA; color:#A6392A; }
+  .letterdiff{ font-family:'Baloo 2', monospace; font-size:19px; letter-spacing:2px; margin:6px 0; word-break: break-all; }
+  .letterdiff .ok-l{ color:#1F6B2B; }
+  .letterdiff .bad-l{ color:#A6392A; text-decoration: underline wavy; }
+  .sentence-box{
+    margin-top:10px; padding-top:10px; border-top:1px dashed #E3C89A;
+    font-size:14.5px; color:var(--ink-soft); line-height:1.6;
+  }
+  .sentence-box b{ color: var(--ink); }
+
+  .quiz-actions{ display:flex; gap:10px; margin-top:16px; }
+
+  /* ---------- Result screen ---------- */
+  .score-hero{ text-align:center; padding: 10px 0 6px; }
+  .score-num{ font-family:'Baloo 2'; font-size:56px; font-weight:800; color:var(--gold-deep); }
+  .score-label{ color:var(--ink-soft); font-weight:700; }
+  .wronglist{ margin-top:8px; }
+  .wrong-item{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 4px; border-bottom:1px solid var(--line); font-size:15px;
+  }
+  .wrong-item:last-child{ border-bottom:none; }
+  .wrong-item .cn{ font-family:'Noto Sans TC'; font-weight:700; }
+  .wrong-item .en{ color: var(--coral); font-weight:800; }
+
+  footer.tip{ text-align:center; color:var(--ink-soft); font-size:12px; margin-top:24px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="brandbar">
+    <svg class="mark" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#F5A623"/><circle cx="50" cy="50" r="30" fill="#FFDDA0"/><circle cx="38" cy="48" r="4.5" fill="#4A3728"/><circle cx="62" cy="48" r="4.5" fill="#4A3728"/><path d="M42 60 Q50 68 58 60" stroke="#4A3728" stroke-width="4" fill="none" stroke-linecap="round"/></svg>
+    <div>
+      <div class="name">快樂獅背單字</div>
+      <div class="sub">Happy Lion Vocabulary</div>
+    </div>
+    <div class="gear" id="gearBtn" title="設定">⚙️</div>
+  </div>
+
+  <!-- ============ SETUP SCREEN ============ -->
+  <section class="screen" id="screen-setup">
+    <div class="card">
+      <h2 style="margin-top:0;">先連接資料來源</h2>
+      <p class="hint" style="margin-top:-6px;">貼上你部署 Google Apps Script 拿到的網址（結尾是 <code>/exec</code>），只需要設定一次，之後會存在這台平板裡。</p>
+      <div class="field">
+        <label>Apps Script Web App 網址</label>
+        <input type="url" id="apiUrlInput" placeholder="https://script.google.com/macros/s/xxxx/exec">
+      </div>
+      <button class="btn btn-primary" id="saveUrlBtn">儲存並繼續</button>
+    </div>
+  </section>
+
+  <!-- ============ HOME SCREEN ============ -->
+  <section class="screen" id="screen-home">
+    <div class="card">
+      <div class="field">
+        <label>是誰要來練習呢？</label>
+        <input type="text" id="userInput" placeholder="輸入名字">
+      </div>
+
+      <div class="field">
+        <label>選擇要背的冊別（可複選）</label>
+        <div class="chip-row" id="bookChips"></div>
+      </div>
+
+      <div class="field">
+        <label>練習模式</label>
+        <div class="chip-row">
+          <div class="chip selected" data-mode="normal"><span class="dot"></span>正常出題</div>
+          <div class="chip" data-mode="review" id="reviewChip"><span class="dot"></span>只考錯過的字</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>出題數量</label>
+        <select id="countSelect">
+          <option value="10">10 題</option>
+          <option value="20" selected>20 題</option>
+          <option value="40">40 題</option>
+          <option value="all">全部</option>
+        </select>
+      </div>
+
+      <button class="btn btn-primary" id="startBtn">開始練習 🦁</button>
+      <p class="hint" id="wordCountHint" style="text-align:center; margin-top:10px;"></p>
+    </div>
+  </section>
+
+  <!-- ============ QUIZ SCREEN ============ -->
+  <section class="screen" id="screen-quiz">
+    <div class="progresswrap">
+      <div class="progressbar"><i id="progFill"></i></div>
+      <div class="progresstxt" id="progText">1 / 20</div>
+    </div>
+
+    <div class="mascot-wrap">
+      <div class="mascot" id="mascot"></div>
+    </div>
+
+    <div class="card">
+      <div class="unit-tag" id="unitTag">第14冊 · U1</div>
+      <div class="cn-word" id="cnWord">單字</div>
+
+      <div class="quiz-input-row">
+        <input type="text" id="answerInput" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="請輸入英文單字">
+        <button class="btn btn-secondary" style="width:auto; padding:15px 20px;" id="submitBtn">送出</button>
+      </div>
+
+      <div class="feedback" id="feedback"></div>
+
+      <div class="quiz-actions">
+        <button class="btn btn-ghost" id="giveUpBtn">我不會，看答案</button>
+        <button class="btn btn-primary" id="nextBtn" style="display:none;">下一題 →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RESULT SCREEN ============ -->
+  <section class="screen" id="screen-result">
+    <div class="card score-hero">
+      <div class="score-num" id="scoreNum">18 / 20</div>
+      <div class="score-label">答對率 <span id="scorePct">90%</span></div>
+    </div>
+    <div class="card" id="wrongCard" style="display:none;">
+      <h3 style="margin-top:0;">這些字可以再複習一下</h3>
+      <div class="wronglist" id="wrongList"></div>
+    </div>
+    <div class="row2">
+      <button class="btn btn-secondary" id="reviewWrongBtn">複習答錯的字</button>
+      <button class="btn btn-primary" id="replayBtn">再玩一次</button>
+    </div>
+    <button class="btn btn-ghost" id="homeBtn" style="margin-top:10px;">回首頁</button>
+  </section>
+
+  <footer class="tip">錯字紀錄只存在這台裝置與你的 Google Sheet 裡</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------------- storage helpers ----------------
+  const LS_API = 'hl_apiUrl';
+  const LS_USER = 'hl_lastUser';
+  const wrongKey = (user) => `hl_wrong_${user}`;
+
+  function getWrongMap(user){
+    try{ return JSON.parse(localStorage.getItem(wrongKey(user)) || '{}'); }
+    catch(e){ return {}; }
+  }
+  function saveWrongMap(user, map){
+    localStorage.setItem(wrongKey(user), JSON.stringify(map));
+  }
+  function wordId(w){ return `${w.book}_${w.unit}_${w.english}`; }
+
+  // ---------------- screens ----------------
+  const screens = ['setup','home','quiz','result'];
+  function showScreen(name){
+    screens.forEach(s => document.getElementById('screen-'+s).classList.toggle('active', s===name));
+    window.scrollTo(0,0);
+  }
+
+  // ---------------- state ----------------
+  let API_URL = localStorage.getItem(LS_API) || '';
+  let allWords = [];
+  let queue = [];
+  let qIndex = 0;
+  let score = 0;
+  let wrongThisRound = [];
+  let streak = 0;
+  let attempts = 0;
+  let currentUser = '';
+
+  // ---------------- setup screen ----------------
+  document.getElementById('gearBtn').addEventListener('click', () => {
+    document.getElementById('apiUrlInput').value = API_URL;
+    showScreen('setup');
+  });
+  document.getElementById('saveUrlBtn').addEventListener('click', () => {
+    const v = document.getElementById('apiUrlInput').value.trim();
+    if(!v){ alert('請貼上網址'); return; }
+    API_URL = v;
+    localStorage.setItem(LS_API, API_URL);
+    initHome();
+  });
+
+  // ---------------- home screen ----------------
+  const BOOKS = ['14','15','16'];
+  let selectedBooks = new Set(['14']);
+  let mode = 'normal';
+
+  function renderBookChips(){
+    const wrap = document.getElementById('bookChips');
+    wrap.innerHTML = '';
+    BOOKS.forEach(b => {
+      const chip = document.createElement('div');
+      chip.className = 'chip' + (selectedBooks.has(b) ? ' selected' : '');
+      chip.innerHTML = `<span class="dot"></span>第 ${b} 冊`;
+      chip.addEventListener('click', () => {
+        if(selectedBooks.has(b)) selectedBooks.delete(b); else selectedBooks.add(b);
+        renderBookChips();
+        updateWordCountHint();
+      });
+      wrap.appendChild(chip);
+    });
+  }
+
+  document.querySelectorAll('#screen-home .chip[data-mode]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      if(chip.id === 'reviewChip'){
+        const wrongCount = Object.keys(getWrongMap(currentUserVal())).length;
+        if(wrongCount === 0){ alert('目前還沒有答錯過的單字喔！'); return; }
+      }
+      document.querySelectorAll('#screen-home .chip[data-mode]').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+      mode = chip.dataset.mode;
+      updateWordCountHint();
+    });
+  });
+
+  function currentUserVal(){
+    return (document.getElementById('userInput').value || '').trim() || '匿名';
+  }
+
+  function updateWordCountHint(){
+    const hint = document.getElementById('wordCountHint');
+    if(mode === 'review'){
+      const n = Object.keys(getWrongMap(currentUserVal())).length;
+      hint.textContent = `目前累積 ${n} 個錯過的單字可以複習`;
+    } else {
+      const n = allWords.filter(w => selectedBooks.has(w.book)).length;
+      hint.textContent = `已選冊別共有 ${n} 個單字`;
+    }
+  }
+  document.getElementById('userInput').addEventListener('input', updateWordCountHint);
+
+  async function initHome(){
+    showScreen('home');
+    document.getElementById('userInput').value = localStorage.getItem(LS_USER) || '';
+    renderBookChips();
+    document.getElementById('wordCountHint').textContent = '載入單字中…';
+    try{
+      const res = await fetch(`${API_URL}?action=getWords`);
+      const data = await res.json();
+      allWords = data.words || [];
+    }catch(e){
+      document.getElementById('wordCountHint').textContent = '⚠️ 無法連線到資料表，請確認網址是否正確（點右上角齒輪重新設定）';
+      return;
+    }
+    updateWordCountHint();
+  }
+
+  function shuffle(arr){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]] = [a[j],a[i]];
+    }
+    return a;
+  }
+
+  document.getElementById('startBtn').addEventListener('click', () => {
+    currentUser = currentUserVal();
+    localStorage.setItem(LS_USER, currentUser);
+
+    let pool;
+    if(mode === 'review'){
+      const map = getWrongMap(currentUser);
+      pool = Object.values(map);
+    } else {
+      pool = allWords.filter(w => selectedBooks.has(w.book));
+    }
+    if(pool.length === 0){ alert('目前沒有可以出題的單字，請重新選擇'); return; }
+
+    // weighted shuffle: words with higher local wrongCount appear more often (normal mode)
+    const wrongMap = getWrongMap(currentUser);
+    let weighted = [];
+    pool.forEach(w => {
+      const rec = wrongMap[wordId(w)];
+      const weight = 1 + (rec ? Math.min(rec.count, 5) * 2 : 0);
+      for(let i=0;i<weight;i++) weighted.push(w);
+    });
+    let shuffled = shuffle(weighted);
+    // dedupe while preserving first-seen order-ish randomness, cap by requested count
+    const seen = new Set();
+    let unique = [];
+    shuffled.forEach(w => {
+      const id = wordId(w);
+      if(!seen.has(id)){ seen.add(id); unique.push(w); }
+    });
+
+    const countVal = document.getElementById('countSelect').value;
+    const n = countVal === 'all' ? unique.length : Math.min(parseInt(countVal,10), unique.length);
+    queue = unique.slice(0, n);
+    qIndex = 0; score = 0; wrongThisRound = []; streak = 0;
+    startQuiz();
+  });
+
+  // ---------------- mascot (lion mane = streak) ----------------
+  function renderMascot(){
+    const el = document.getElementById('mascot');
+    const spikes = Math.min(streak, 12);
+    let spikeSvg = '';
+    for(let i=0;i<12;i++){
+      const angle = (i/12)*360;
+      const show = i < spikes;
+      spikeSvg += `<polygon class="spike" points="75,10 82,32 68,32" fill="${show?'#D9860A':'#F1E1C4'}"
+        transform="rotate(${angle} 75 75)" style="opacity:${show?1:0.5}"></polygon>`;
+    }
+    el.innerHTML = `<svg viewBox="0 0 150 150">
+      ${spikeSvg}
+      <circle cx="75" cy="75" r="42" fill="#F5A623"/>
+      <circle cx="75" cy="78" r="30" fill="#FFE3AE"/>
+      <circle cx="63" cy="74" r="5" fill="#4A3728"/>
+      <circle cx="87" cy="74" r="5" fill="#4A3728"/>
+      <ellipse cx="75" cy="86" rx="5" ry="3.5" fill="#B5651D"/>
+      <path d="M64 94 Q75 104 86 94" stroke="#4A3728" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+    </svg>`;
+  }
+
+  // ---------------- quiz logic ----------------
+  function startQuiz(){
+    showScreen('quiz');
+    renderMascot();
+    nextQuestion();
+  }
+
+  let current = null;
+
+  function nextQuestion(){
+    document.getElementById('feedback').className = 'feedback';
+    document.getElementById('feedback').innerHTML = '';
+    document.getElementById('nextBtn').style.display = 'none';
+    document.getElementById('giveUpBtn').style.display = 'inline-flex';
+    document.getElementById('answerInput').className = '';
+    document.getElementById('answerInput').value = '';
+    document.getElementById('answerInput').disabled = false;
+    attempts = 0;
+
+    if(qIndex >= queue.length){ finishQuiz(); return; }
+
+    current = queue[qIndex];
+    document.getElementById('unitTag').textContent = `第 ${current.book} 冊 · ${current.unit}`;
+    document.getElementById('cnWord').textContent = current.chinese;
+    document.getElementById('progText').textContent = `${qIndex+1} / ${queue.length}`;
+    document.getElementById('progFill').style.width = `${(qIndex/queue.length)*100}%`;
+
+    setTimeout(() => document.getElementById('answerInput').focus(), 50);
+  }
+
+  function normalize(s){ return (s||'').trim().toLowerCase(); }
+
+  function diffHtml(userAns, correct){
+    const u = userAns.trim();
+    let html = '';
+    for(let i=0;i<correct.length;i++){
+      const cch = correct[i];
+      const uch = u[i];
+      if(uch && uch.toLowerCase() === cch.toLowerCase()){
+        html += `<span class="ok-l">${cch}</span>`;
+      } else {
+        html += `<span class="bad-l">${cch}</span>`;
+      }
+    }
+    return html;
+  }
+
+  function recordResult(word, correct){
+    // local storage
+    const map = getWrongMap(currentUser);
+    const id = wordId(word);
+    if(correct){
+      if(map[id]) map[id].count = Math.max(0, map[id].count - 1);
+      if(map[id] && map[id].count <= 0) delete map[id];
+    } else {
+      if(!map[id]) map[id] = { ...word, count: 0 };
+      map[id].count += 1;
+    }
+    saveWrongMap(currentUser, map);
+
+    // best-effort remote log (won't block UI, ignore failures)
+    try{
+      fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          action: 'recordAnswer',
+          user: currentUser,
+          book: word.book,
+          unit: word.unit,
+          english: word.english,
+          correct: correct,
+          wrongCount: (map[id] ? map[id].count : 0)
+        })
+      }).catch(()=>{});
+    }catch(e){}
+  }
+
+  function showSentence(){
+    if(!current.sentence) return '';
+    const re = new RegExp(current.english, 'i');
+    const highlighted = current.sentence.replace(re, m => `<b>${m}</b>`);
+    return `<div class="sentence-box">📖 ${highlighted}</div>`;
+  }
+
+  function submitAnswer(){
+    const input = document.getElementById('answerInput');
+    const val = input.value;
+    if(!val.trim()) { input.focus(); return; }
+    attempts++;
+
+    const correct = normalize(val) === normalize(current.english);
+    const fb = document.getElementById('feedback');
+
+    if(correct){
+      input.className = 'right-flash';
+      input.disabled = true;
+      streak++;
+      score++;
+      fb.className = 'feedback show ok';
+      fb.innerHTML = `🎉 答對了！<b>${current.english}</b>` + showSentence();
+      recordResult(current, true);
+      document.getElementById('nextBtn').style.display = 'inline-flex';
+      document.getElementById('giveUpBtn').style.display = 'none';
+      renderMascot();
+      setTimeout(() => document.getElementById('nextBtn').focus(), 100);
+    } else {
+      input.className = 'wrong-flash';
+      streak = 0;
+      renderMascot();
+      if(attempts >= 3){
+        // reveal
+        wrongThisRound.push(current);
+        recordResult(current, false);
+        fb.className = 'feedback show bad';
+        fb.innerHTML = `😿 正確答案是 <b>${current.english}</b>` + showSentence();
+        input.disabled = true;
+        document.getElementById('nextBtn').style.display = 'inline-flex';
+        document.getElementById('giveUpBtn').style.display = 'none';
+      } else {
+        fb.className = 'feedback show bad';
+        let hint = '';
+        if(attempts === 1){
+          hint = `再試一次！提示：開頭是 <b>${current.english[0]}</b>＿＿＿（共 ${current.english.length} 個字母）`;
+        } else {
+          hint = `再看一次拼字對照：<div class="letterdiff">${diffHtml(val, current.english)}</div>綠色是對的字母，紅色底線是要修正的地方，再試最後一次！`;
+        }
+        fb.innerHTML = hint;
+        input.value = '';
+        setTimeout(() => input.focus(), 30);
+      }
+    }
+  }
+
+  document.getElementById('submitBtn').addEventListener('click', submitAnswer);
+  document.getElementById('answerInput').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') submitAnswer();
+  });
+  document.getElementById('giveUpBtn').addEventListener('click', () => {
+    wrongThisRound.push(current);
+    recordResult(current, false);
+    streak = 0; renderMascot();
+    const fb = document.getElementById('feedback');
+    fb.className = 'feedback show bad';
+    fb.innerHTML = `答案是 <b>${current.english}</b>，沒關係，下次會記得！` + showSentence();
+    document.getElementById('answerInput').disabled = true;
+    document.getElementById('nextBtn').style.display = 'inline-flex';
+    document.getElementById('giveUpBtn').style.display = 'none';
+  });
+  document.getElementById('nextBtn').addEventListener('click', () => {
+    qIndex++;
+    nextQuestion();
+  });
+
+  // ---------------- result screen ----------------
+  function finishQuiz(){
+    showScreen('result');
+    document.getElementById('progFill').style.width = '100%';
+    const total = queue.length;
+    document.getElementById('scoreNum').textContent = `${score} / ${total}`;
+    document.getElementById('scorePct').textContent = `${Math.round((score/total)*100)}%`;
+
+    const wrongCard = document.getElementById('wrongCard');
+    const list = document.getElementById('wrongList');
+    list.innerHTML = '';
+    if(wrongThisRound.length){
+      wrongCard.style.display = 'block';
+      wrongThisRound.forEach(w => {
+        const div = document.createElement('div');
+        div.className = 'wrong-item';
+        div.innerHTML = `<span class="cn">${w.chinese}</span><span class="en">${w.english}</span>`;
+        list.appendChild(div);
+      });
+    } else {
+      wrongCard.style.display = 'none';
+    }
+  }
+
+  document.getElementById('replayBtn').addEventListener('click', () => {
+    qIndex = 0; score = 0; wrongThisRound = []; streak = 0;
+    queue = shuffle(queue);
+    startQuiz();
+  });
+  document.getElementById('reviewWrongBtn').addEventListener('click', () => {
+    if(wrongThisRound.length === 0){ alert('這局沒有答錯的字喔，太棒了！'); return; }
+    queue = shuffle(wrongThisRound);
+    qIndex = 0; score = 0; wrongThisRound = []; streak = 0;
+    startQuiz();
+  });
+  document.getElementById('homeBtn').addEventListener('click', initHome);
+
+  // ---------------- boot ----------------
+  if(!API_URL){
+    showScreen('setup');
+  } else {
+    initHome();
+  }
+})();
+</script>
+</body>
+</html>
