@@ -247,6 +247,7 @@
       </div>
 
       <div class="feedback" id="feedback"></div>
+      <button class="btn btn-ghost" id="speakBtn" style="display:none; margin-top:10px;">🔊 再聽一次發音</button>
 
       <div class="quiz-actions">
         <button class="btn btn-ghost" id="giveUpBtn">我不會，看答案</button>
@@ -470,6 +471,7 @@
     document.getElementById('feedback').innerHTML = '';
     document.getElementById('nextBtn').style.display = 'none';
     document.getElementById('giveUpBtn').style.display = 'inline-flex';
+    document.getElementById('speakBtn').style.display = 'none';
     document.getElementById('answerInput').className = '';
     document.getElementById('answerInput').value = '';
     document.getElementById('answerInput').disabled = false;
@@ -487,6 +489,21 @@
   }
 
   function normalize(s){ return (s||'').trim().toLowerCase(); }
+
+  // ---------------- text-to-speech ----------------
+  function speak(text){
+    if(!('speechSynthesis' in window) || !text) return;
+    try{
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-US';
+      u.rate = 0.9;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  }
+  document.getElementById('speakBtn').addEventListener('click', () => {
+    if(current) speak(current.english);
+  });
 
   function diffHtml(userAns, correct){
     const u = userAns.trim();
@@ -560,7 +577,9 @@
       recordResult(current, true);
       document.getElementById('nextBtn').style.display = 'inline-flex';
       document.getElementById('giveUpBtn').style.display = 'none';
+      document.getElementById('speakBtn').style.display = 'inline-flex';
       renderMascot();
+      speak(current.english);
       setTimeout(() => document.getElementById('nextBtn').focus(), 100);
     } else {
       input.className = 'wrong-flash';
@@ -575,6 +594,8 @@
         input.disabled = true;
         document.getElementById('nextBtn').style.display = 'inline-flex';
         document.getElementById('giveUpBtn').style.display = 'none';
+        document.getElementById('speakBtn').style.display = 'inline-flex';
+        speak(current.english);
       } else {
         fb.className = 'feedback show bad';
         let hint = '';
@@ -604,6 +625,8 @@
     document.getElementById('answerInput').disabled = true;
     document.getElementById('nextBtn').style.display = 'inline-flex';
     document.getElementById('giveUpBtn').style.display = 'none';
+    document.getElementById('speakBtn').style.display = 'inline-flex';
+    speak(current.english);
   });
   document.getElementById('nextBtn').addEventListener('click', () => {
     qIndex++;
