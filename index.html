@@ -304,7 +304,7 @@
 
   // ---------------- state ----------------
   let API_URL = FIXED_API_URL;
-  let allWords = [];
+  let bookCounts = {}; // { '14': 265, ... } lightweight, loaded on home screen
   let queue = [];
   let qIndex = 0;
   let score = 0;
@@ -359,30 +359,56 @@
     } else if(selectedBooks.size === 0){
       hint.textContent = '請至少選擇一個冊別';
     } else {
-      const n = allWords.filter(w => selectedBooks.has(w.book)).length;
+      const n = [...selectedBooks].reduce((sum, b) => sum + (bookCounts[b] || 0), 0);
       hint.textContent = `已選冊別共有 ${n} 個單字`;
     }
   }
   document.getElementById('userInput').addEventListener('input', updateWordCountHint);
 
+  // ---------------- word fetching with local cache ----------------
+  const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+  async function fetchWordsForBooks(books){
+    const key = 'hl_wordcache_' + books.slice().sort().join('-');
+    try{
+      const cachedRaw = localStorage.getItem(key);
+      if(cachedRaw){
+        const cached = JSON.parse(cachedRaw);
+        if(Date.now() - cached.ts < CACHE_TTL_MS){
+          return cached.words;
+        }
+      }
+    }catch(e){}
+
+    const res = await fetch(`${API_URL}?action=getWords&books=${books.join(',')}`);
+    const data = await res.json();
+    const words = data.words || [];
+    try{
+      localStorage.setItem(key, JSON.stringify({ ts: Date.now(), words }));
+    }catch(e){} // storage full or unavailable, just skip caching
+    return words;
+  }
+
   async function initHome(){
     showScreen('home');
     document.getElementById('userInput').value = localStorage.getItem(LS_USER) || '';
-    document.getElementById('wordCountHint').textContent = '載入單字中…';
+    document.getElementById('wordCountHint').textContent = '載入冊別中…';
     document.getElementById('startBtn').disabled = true;
     try{
-      const res = await fetch(`${API_URL}?action=getWords`);
+      const res = await fetch(`${API_URL}?action=getBooks`);
       const data = await res.json();
-      allWords = data.words || [];
+      const found = data.books || []; // [{book, count}, ...]
+      bookCounts = {};
+      found.forEach(b => { bookCounts[b.book] = b.count; });
+      const foundBooks = found.map(b => b.book);
+      if(foundBooks.length){
+        BOOKS = foundBooks;
+        selectedBooks = new Set([...selectedBooks].filter(b => BOOKS.includes(b)));
+      }
     }catch(e){
       document.getElementById('bookChips').innerHTML = '<span class="hint">⚠️ 無法載入冊別</span>';
       document.getElementById('wordCountHint').textContent = '⚠️ 無法連線到資料表，請確認網址是否正確';
       return;
-    }
-    const foundBooks = [...new Set(allWords.map(w => w.book))].sort((a,b) => Number(a)-Number(b));
-    if(foundBooks.length){
-      BOOKS = foundBooks;
-      selectedBooks = new Set([...selectedBooks].filter(b => BOOKS.includes(b)));
     }
     renderBookChips();
     document.getElementById('startBtn').disabled = false;
@@ -398,7 +424,7 @@
     return a;
   }
 
-  document.getElementById('startBtn').addEventListener('click', () => {
+  document.getElementById('startBtn').addEventListener('click', async () => {
     currentUser = currentUserVal();
     localStorage.setItem(LS_USER, currentUser);
 
@@ -407,7 +433,21 @@
       const map = getWrongMap(currentUser);
       pool = Object.values(map);
     } else {
-      pool = allWords.filter(w => selectedBooks.has(w.book));
+      if(selectedBooks.size === 0){ alert('請至少選擇一個冊別'); return; }
+      const startBtn = document.getElementById('startBtn');
+      const originalText = startBtn.textContent;
+      startBtn.disabled = true;
+      startBtn.textContent = '載入單字中…';
+      try{
+        pool = await fetchWordsForBooks([...selectedBooks]);
+      }catch(e){
+        alert('無法載入單字，請檢查網路連線後再試一次');
+        startBtn.disabled = false;
+        startBtn.textContent = originalText;
+        return;
+      }
+      startBtn.disabled = false;
+      startBtn.textContent = originalText;
     }
     if(pool.length === 0){ alert('目前沒有可以出題的單字，請重新選擇'); return; }
 
