@@ -120,6 +120,12 @@
   .progressbar{ flex:1; height:10px; border-radius:6px; background:var(--line); overflow:hidden; }
   .progressbar > i{ display:block; height:100%; background: linear-gradient(90deg, var(--gold), var(--sky)); width:0%; transition: width .3s ease; }
   .progresstxt{ font-weight:800; color:var(--ink-soft); font-size:13px; white-space:nowrap; }
+  .exit-btn{
+    border:2px solid var(--line); background:var(--card); color:var(--ink-soft);
+    font-weight:800; font-size:12.5px; border-radius:999px; padding:7px 12px;
+    cursor:pointer; white-space:nowrap; flex:none;
+  }
+  .exit-btn:active{ background:#FDEDEA; color:var(--coral); border-color:#F3C3BB; }
 
   .unit-tag{
     display:inline-block; background:#EAF7FB; color: var(--sky-deep);
@@ -181,21 +187,7 @@
       <div class="name">快樂獅背單字</div>
       <div class="sub">Happy Lion Vocabulary</div>
     </div>
-    <div class="gear" id="gearBtn" title="設定">⚙️</div>
   </div>
-
-  <!-- ============ SETUP SCREEN ============ -->
-  <section class="screen" id="screen-setup">
-    <div class="card">
-      <h2 style="margin-top:0;">先連接資料來源</h2>
-      <p class="hint" style="margin-top:-6px;">貼上你部署 Google Apps Script 拿到的網址（結尾是 <code>/exec</code>），只需要設定一次，之後會存在這台平板裡。</p>
-      <div class="field">
-        <label>Apps Script Web App 網址</label>
-        <input type="url" id="apiUrlInput" placeholder="https://script.google.com/macros/s/xxxx/exec">
-      </div>
-      <button class="btn btn-primary" id="saveUrlBtn">儲存並繼續</button>
-    </div>
-  </section>
 
   <!-- ============ HOME SCREEN ============ -->
   <section class="screen" id="screen-home">
@@ -238,6 +230,7 @@
     <div class="progresswrap">
       <div class="progressbar"><i id="progFill"></i></div>
       <div class="progresstxt" id="progText">1 / 20</div>
+      <button class="exit-btn" id="exitBtn" title="中途離開">✕ 結束</button>
     </div>
 
     <div class="mascot-wrap">
@@ -287,6 +280,7 @@
   "use strict";
 
   // ---------------- storage helpers ----------------
+  const FIXED_API_URL = 'https://script.google.com/macros/s/AKfycbzSDkyaTOOUU2snHE5z9l5DweGN7YvqrzWIEBK3GgqPDP5-_UyqWwdmKKTGcWyPrunM/exec';
   const LS_API = 'hl_apiUrl';
   const LS_USER = 'hl_lastUser';
   const wrongKey = (user) => `hl_wrong_${user}`;
@@ -301,14 +295,14 @@
   function wordId(w){ return `${w.book}_${w.unit}_${w.english}`; }
 
   // ---------------- screens ----------------
-  const screens = ['setup','home','quiz','result'];
+  const screens = ['home','quiz','result'];
   function showScreen(name){
     screens.forEach(s => document.getElementById('screen-'+s).classList.toggle('active', s===name));
     window.scrollTo(0,0);
   }
 
   // ---------------- state ----------------
-  let API_URL = localStorage.getItem(LS_API) || '';
+  let API_URL = FIXED_API_URL;
   let allWords = [];
   let queue = [];
   let qIndex = 0;
@@ -317,19 +311,6 @@
   let streak = 0;
   let attempts = 0;
   let currentUser = '';
-
-  // ---------------- setup screen ----------------
-  document.getElementById('gearBtn').addEventListener('click', () => {
-    document.getElementById('apiUrlInput').value = API_URL;
-    showScreen('setup');
-  });
-  document.getElementById('saveUrlBtn').addEventListener('click', () => {
-    const v = document.getElementById('apiUrlInput').value.trim();
-    if(!v){ alert('請貼上網址'); return; }
-    API_URL = v;
-    localStorage.setItem(LS_API, API_URL);
-    initHome();
-  });
 
   // ---------------- home screen ----------------
   const BOOKS = ['14','15','16'];
@@ -619,11 +600,21 @@
     nextQuestion();
   });
 
+  // ---------------- exit midway ----------------
+  document.getElementById('exitBtn').addEventListener('click', () => {
+    if(!confirm('確定要中途結束這次練習嗎？已經作答的題目都存好了。')) return;
+    if(qIndex > 0){
+      finishQuiz(qIndex); // show partial results based on questions actually answered
+    } else {
+      initHome(); // hasn't answered anything yet, just leave quietly
+    }
+  });
+
   // ---------------- result screen ----------------
-  function finishQuiz(){
+  function finishQuiz(totalOverride){
     showScreen('result');
     document.getElementById('progFill').style.width = '100%';
-    const total = queue.length;
+    const total = totalOverride || queue.length;
     document.getElementById('scoreNum').textContent = `${score} / ${total}`;
     document.getElementById('scorePct').textContent = `${Math.round((score/total)*100)}%`;
 
@@ -657,11 +648,7 @@
   document.getElementById('homeBtn').addEventListener('click', initHome);
 
   // ---------------- boot ----------------
-  if(!API_URL){
-    showScreen('setup');
-  } else {
-    initHome();
-  }
+  initHome();
 })();
 </script>
 </body>
