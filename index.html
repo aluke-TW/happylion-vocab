@@ -273,7 +273,7 @@
     <button class="btn btn-ghost" id="homeBtn" style="margin-top:10px;">回首頁</button>
   </section>
 
-  <footer class="tip">錯字紀錄只存在這台裝置與你的 Google Sheet 裡</footer>
+  <footer class="tip">錯字紀錄只存在這台裝置，不會上傳到任何地方</footer>
 </div>
 
 <script>
@@ -561,7 +561,9 @@
   }
 
   function recordResult(word, correct){
-    // local storage
+    // local storage only — no data is ever sent to Google Sheet.
+    // Only the shared word list (words sheet) is read; individual quiz
+    // results and wrong-word tracking stay entirely on this device.
     const map = getWrongMap(currentUser);
     const id = wordId(word);
     if(correct){
@@ -572,23 +574,6 @@
       map[id].count += 1;
     }
     saveWrongMap(currentUser, map);
-
-    // best-effort remote log (won't block UI, ignore failures)
-    try{
-      fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({
-          action: 'recordAnswer',
-          user: currentUser,
-          book: word.book,
-          unit: word.unit,
-          english: word.english,
-          correct: correct,
-          wrongCount: (map[id] ? map[id].count : 0)
-        })
-      }).catch(()=>{});
-    }catch(e){}
   }
 
   function showSentence(){
