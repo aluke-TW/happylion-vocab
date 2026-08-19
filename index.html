@@ -314,7 +314,7 @@
 
   // ---------------- home screen ----------------
   let BOOKS = ['14','15','16']; // fallback until real data loads
-  let selectedBooks = new Set(['14']);
+  let selectedBooks = new Set();
   let mode = 'normal';
 
   function renderBookChips(){
@@ -355,6 +355,8 @@
     if(mode === 'review'){
       const n = Object.keys(getWrongMap(currentUserVal())).length;
       hint.textContent = `目前累積 ${n} 個錯過的單字可以複習`;
+    } else if(selectedBooks.size === 0){
+      hint.textContent = '請至少選擇一個冊別';
     } else {
       const n = allWords.filter(w => selectedBooks.has(w.book)).length;
       hint.textContent = `已選冊別共有 ${n} 個單字`;
@@ -380,7 +382,6 @@
     if(foundBooks.length){
       BOOKS = foundBooks;
       selectedBooks = new Set([...selectedBooks].filter(b => BOOKS.includes(b)));
-      if(selectedBooks.size === 0) selectedBooks.add(BOOKS[0]);
     }
     renderBookChips();
     document.getElementById('startBtn').disabled = false;
