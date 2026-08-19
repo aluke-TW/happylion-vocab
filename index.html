@@ -199,7 +199,7 @@
 
       <div class="field">
         <label>選擇要背的冊別（可複選）</label>
-        <div class="chip-row" id="bookChips"></div>
+        <div class="chip-row" id="bookChips"><span class="hint">載入冊別中…</span></div>
       </div>
 
       <div class="field">
@@ -313,7 +313,7 @@
   let currentUser = '';
 
   // ---------------- home screen ----------------
-  const BOOKS = ['14','15','16'];
+  let BOOKS = ['14','15','16']; // fallback until real data loads
   let selectedBooks = new Set(['14']);
   let mode = 'normal';
 
@@ -365,16 +365,25 @@
   async function initHome(){
     showScreen('home');
     document.getElementById('userInput').value = localStorage.getItem(LS_USER) || '';
-    renderBookChips();
     document.getElementById('wordCountHint').textContent = '載入單字中…';
+    document.getElementById('startBtn').disabled = true;
     try{
       const res = await fetch(`${API_URL}?action=getWords`);
       const data = await res.json();
       allWords = data.words || [];
     }catch(e){
-      document.getElementById('wordCountHint').textContent = '⚠️ 無法連線到資料表，請確認網址是否正確（點右上角齒輪重新設定）';
+      document.getElementById('bookChips').innerHTML = '<span class="hint">⚠️ 無法載入冊別</span>';
+      document.getElementById('wordCountHint').textContent = '⚠️ 無法連線到資料表，請確認網址是否正確';
       return;
     }
+    const foundBooks = [...new Set(allWords.map(w => w.book))].sort((a,b) => Number(a)-Number(b));
+    if(foundBooks.length){
+      BOOKS = foundBooks;
+      selectedBooks = new Set([...selectedBooks].filter(b => BOOKS.includes(b)));
+      if(selectedBooks.size === 0) selectedBooks.add(BOOKS[0]);
+    }
+    renderBookChips();
+    document.getElementById('startBtn').disabled = false;
     updateWordCountHint();
   }
 
