@@ -83,6 +83,13 @@
   input:focus, select:focus{ outline:none; border-color: var(--gold); }
 
   .chip-row{ display:flex; flex-wrap:wrap; gap:10px; }
+  .quick-select-row{ display:flex; gap:16px; margin-top:8px; }
+  .link-btn{
+    background:none; border:none; padding:2px 0; cursor:pointer;
+    font-family:inherit; font-weight:800; font-size:13px; color: var(--sky-deep);
+    text-decoration: underline; text-underline-offset: 3px;
+  }
+  .link-btn:active{ opacity:.6; }
   .chip{
     border:2px solid var(--line); background:#FFFDF8; border-radius:14px;
     padding:12px 16px; font-weight:800; cursor:pointer; font-size:15px;
@@ -203,6 +210,10 @@
       <div class="field">
         <label>選擇要背的冊別（可複選）</label>
         <div class="chip-row" id="bookChips"><span class="hint">載入冊別中…</span></div>
+        <div class="quick-select-row">
+          <button type="button" class="link-btn" id="selectAllBtn">全選</button>
+          <button type="button" class="link-btn" id="clearAllBtn">清除選擇</button>
+        </div>
       </div>
 
       <div class="field">
@@ -336,6 +347,17 @@
       wrap.appendChild(chip);
     });
   }
+
+  document.getElementById('selectAllBtn').addEventListener('click', () => {
+    selectedBooks = new Set(BOOKS);
+    renderBookChips();
+    updateWordCountHint();
+  });
+  document.getElementById('clearAllBtn').addEventListener('click', () => {
+    selectedBooks = new Set();
+    renderBookChips();
+    updateWordCountHint();
+  });
 
   document.querySelectorAll('#screen-home .chip[data-mode]').forEach(chip => {
     chip.addEventListener('click', () => {
