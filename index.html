@@ -145,20 +145,23 @@
   @keyframes shake{ 0%,100%{transform:translateX(0);} 25%{transform:translateX(-6px);} 75%{transform:translateX(6px);} }
 
   .feedback{
-    margin-top:14px; border-radius:16px; padding:14px 16px; font-weight:700; font-size:15px;
-    display:none;
+    margin-top:14px; border-radius:16px; padding:16px 18px; font-weight:700; font-size:17px;
+    display:none; line-height:1.6;
   }
   .feedback.show{ display:block; animation: rise .25s ease; }
   .feedback.ok{ background:#EAF8EC; color:#1F6B2B; }
   .feedback.bad{ background:#FDEDEA; color:#A6392A; }
-  .letterdiff{ font-family:'Baloo 2', monospace; font-size:19px; letter-spacing:2px; margin:6px 0; word-break: break-all; }
+  .feedback b{
+    font-family:'Baloo 2', sans-serif; font-size:1.7em; display:inline-block; margin:2px 4px;
+  }
+  .letterdiff{ font-family:'Baloo 2', monospace; font-size:26px; letter-spacing:3px; margin:8px 0; word-break: break-all; }
   .letterdiff .ok-l{ color:#1F6B2B; }
   .letterdiff .bad-l{ color:#A6392A; text-decoration: underline wavy; }
   .sentence-box{
-    margin-top:10px; padding-top:10px; border-top:1px dashed #E3C89A;
-    font-size:14.5px; color:var(--ink-soft); line-height:1.6;
+    margin-top:12px; padding-top:12px; border-top:1px dashed #E3C89A;
+    font-size:17px; color:var(--ink-soft); line-height:1.7;
   }
-  .sentence-box b{ color: var(--ink); }
+  .sentence-box b{ color: var(--ink); font-size:1.15em; }
 
   .quiz-actions{ display:flex; gap:10px; margin-top:16px; }
 
@@ -247,7 +250,7 @@
       </div>
 
       <div class="feedback" id="feedback"></div>
-      <button class="btn btn-ghost" id="speakBtn" style="display:none; margin-top:10px;">🔊 再聽一次發音</button>
+      <button class="btn btn-ghost" id="speakBtn" style="display:none; margin-top:10px;">🔊 再聽一次（單字＋例句）</button>
 
       <div class="quiz-actions">
         <button class="btn btn-ghost" id="giveUpBtn">我不會，看答案</button>
@@ -533,16 +536,23 @@
   // ---------------- text-to-speech ----------------
   function speak(text){
     if(!('speechSynthesis' in window) || !text) return;
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'en-US';
+    u.rate = 0.9;
+    speechSynthesis.speak(u);
+  }
+  // Speak the word, then (after a short pause) the example sentence.
+  // cancel() is only called once at the start so the two utterances queue and play in order.
+  function speakWordAndSentence(word, sentence){
+    if(!('speechSynthesis' in window)) return;
     try{
       speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'en-US';
-      u.rate = 0.9;
-      speechSynthesis.speak(u);
+      if(word) speak(word);
+      if(sentence) speak(sentence);
     }catch(e){}
   }
   document.getElementById('speakBtn').addEventListener('click', () => {
-    if(current) speak(current.english);
+    if(current) speakWordAndSentence(current.english, current.sentence);
   });
 
   function diffHtml(userAns, correct){
@@ -604,7 +614,7 @@
       document.getElementById('giveUpBtn').style.display = 'none';
       document.getElementById('speakBtn').style.display = 'inline-flex';
       renderMascot();
-      speak(current.english);
+      speakWordAndSentence(current.english, current.sentence);
       setTimeout(() => document.getElementById('nextBtn').focus(), 100);
     } else {
       input.className = 'wrong-flash';
@@ -620,7 +630,7 @@
         document.getElementById('nextBtn').style.display = 'inline-flex';
         document.getElementById('giveUpBtn').style.display = 'none';
         document.getElementById('speakBtn').style.display = 'inline-flex';
-        speak(current.english);
+        speakWordAndSentence(current.english, current.sentence);
       } else {
         fb.className = 'feedback show bad';
         let hint = '';
@@ -651,7 +661,7 @@
     document.getElementById('nextBtn').style.display = 'inline-flex';
     document.getElementById('giveUpBtn').style.display = 'none';
     document.getElementById('speakBtn').style.display = 'inline-flex';
-    speak(current.english);
+    speakWordAndSentence(current.english, current.sentence);
   });
   document.getElementById('nextBtn').addEventListener('click', () => {
     qIndex++;
