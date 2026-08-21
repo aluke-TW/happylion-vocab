@@ -142,6 +142,16 @@
     font-family:'Noto Sans TC', sans-serif; font-weight:900;
     font-size: clamp(34px, 9vw, 52px); text-align:center; margin: 6px 0 4px; line-height:1.25;
   }
+  .listen-prompt{ text-align:center; margin: 10px 0 4px; }
+  .speaker-big{
+    width:110px; height:110px; border-radius:50%; border:none;
+    background: linear-gradient(180deg, #7FD0EE, var(--sky));
+    color:#043043; font-size:48px; cursor:pointer;
+    box-shadow: 0 8px 0 rgba(0,0,0,0.08);
+    transition: transform .08s ease;
+  }
+  .speaker-big:active{ transform: translateY(4px); box-shadow: 0 4px 0 rgba(0,0,0,0.08); }
+  .listen-tip{ color: var(--ink-soft); font-weight:700; font-size:14px; margin-top:10px; }
   .quiz-input-row{ display:flex; gap:10px; margin-top:16px; }
   .quiz-input-row input{
     flex:1; text-align:center; font-size:22px; font-weight:800;
@@ -225,6 +235,23 @@
       </div>
 
       <div class="field">
+        <label>出題方式</label>
+        <div class="chip-row">
+          <div class="chip selected" data-qtype="cn2en"><span class="dot"></span>看中文拼英文</div>
+          <div class="chip" data-qtype="listen"><span class="dot"></span>🔊 聽發音拼英文</div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>例句朗讀速度</label>
+        <select id="sentenceRateSelect">
+          <option value="0.6">慢速</option>
+          <option value="0.8" selected>正常</option>
+          <option value="1.0">稍快</option>
+        </select>
+      </div>
+
+      <div class="field">
         <label>出題數量</label>
         <select id="countSelect">
           <option value="10">10 題</option>
@@ -254,6 +281,10 @@
     <div class="card">
       <div class="unit-tag" id="unitTag">第14冊 · U1</div>
       <div class="cn-word" id="cnWord">單字</div>
+      <div class="listen-prompt" id="listenPrompt" style="display:none;">
+        <button type="button" class="speaker-big" id="playWordBtn">🔊</button>
+        <div class="listen-tip">點喇叭聽發音，拼出你聽到的單字</div>
+      </div>
 
       <div class="quiz-input-row">
         <input type="text" id="answerInput" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="請輸入英文單字">
@@ -309,6 +340,18 @@
   }
   function wordId(w){ return `${w.book}_${w.unit}_${w.english}`; }
 
+  // last-shown cooldown: prevents the same handful of high-weight words from
+  // dominating every single round in a row
+  const COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6 hours
+  const lastShownKey = (user) => `hl_lastshown_${user}`;
+  function getLastShownMap(user){
+    try{ return JSON.parse(localStorage.getItem(lastShownKey(user)) || '{}'); }
+    catch(e){ return {}; }
+  }
+  function saveLastShownMap(user, map){
+    localStorage.setItem(lastShownKey(user), JSON.stringify(map));
+  }
+
   // ---------------- screens ----------------
   const screens = ['home','quiz','result'];
   function showScreen(name){
@@ -331,6 +374,9 @@
   let BOOKS = ['14','15','16']; // fallback until real data loads
   let selectedBooks = new Set();
   let mode = 'normal';
+  let qType = 'cn2en'; // 'cn2en' = 看中文拼英文, 'listen' = 聽發音拼英文
+  const LS_SENTENCE_RATE = 'hl_sentenceRate';
+  let sentenceRate = parseFloat(localStorage.getItem(LS_SENTENCE_RATE)) || 0.8;
 
   function renderBookChips(){
     const wrap = document.getElementById('bookChips');
@@ -370,6 +416,21 @@
       mode = chip.dataset.mode;
       updateWordCountHint();
     });
+  });
+
+  document.querySelectorAll('#screen-home .chip[data-qtype]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#screen-home .chip[data-qtype]').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+      qType = chip.dataset.qtype;
+    });
+  });
+
+  const sentenceRateSelect = document.getElementById('sentenceRateSelect');
+  sentenceRateSelect.value = String(sentenceRate);
+  sentenceRateSelect.addEventListener('change', () => {
+    sentenceRate = parseFloat(sentenceRateSelect.value);
+    localStorage.setItem(LS_SENTENCE_RATE, sentenceRateSelect.value);
   });
 
   function currentUserVal(){
@@ -476,12 +537,22 @@
     }
     if(pool.length === 0){ alert('目前沒有可以出題的單字，請重新選擇'); return; }
 
-    // weighted shuffle: words with higher local wrongCount appear more often (normal mode)
+    // weighted shuffle: words with higher local wrongCount appear more often (normal mode),
+    // but words shown recently get temporarily deprioritized so the same handful of words
+    // don't dominate every single round.
     const wrongMap = getWrongMap(currentUser);
+    const lastShownMap = getLastShownMap(currentUser);
+    const now = Date.now();
     let weighted = [];
     pool.forEach(w => {
-      const rec = wrongMap[wordId(w)];
-      const weight = 1 + (rec ? Math.min(rec.count, 5) * 2 : 0);
+      const id = wordId(w);
+      const rec = wrongMap[id];
+      let weight = 1 + (rec ? Math.min(rec.count, 3) : 0); // max weight capped at 4 (was 11)
+
+      const lastShown = lastShownMap[id];
+      if(lastShown && (now - lastShown) < COOLDOWN_MS){
+        weight = 1; // recently tested — let other words take priority this round
+      }
       for(let i=0;i<weight;i++) weighted.push(w);
     });
     let shuffled = shuffle(weighted);
@@ -496,6 +567,12 @@
     const countVal = document.getElementById('countSelect').value;
     const n = countVal === 'all' ? unique.length : Math.min(parseInt(countVal,10), unique.length);
     queue = unique.slice(0, n);
+
+    // record that these words were shown this round, for next round's cooldown check
+    const newLastShown = getLastShownMap(currentUser);
+    queue.forEach(w => { newLastShown[wordId(w)] = now; });
+    saveLastShownMap(currentUser, newLastShown);
+
     qIndex = 0; score = 0; wrongThisRound = []; streak = 0;
     startQuiz();
   });
@@ -546,9 +623,21 @@
 
     current = queue[qIndex];
     document.getElementById('unitTag').textContent = `第 ${current.book} 冊 · ${current.unit}`;
-    document.getElementById('cnWord').textContent = current.chinese;
     document.getElementById('progText').textContent = `${qIndex+1} / ${queue.length}`;
     document.getElementById('progFill').style.width = `${(qIndex/queue.length)*100}%`;
+
+    const answerInput = document.getElementById('answerInput');
+    if(qType === 'listen'){
+      document.getElementById('cnWord').style.display = 'none';
+      document.getElementById('listenPrompt').style.display = 'block';
+      answerInput.placeholder = '請輸入你聽到的英文單字';
+      speakSentenceThenWord(current.english, current.sentence);
+    } else {
+      document.getElementById('cnWord').style.display = 'block';
+      document.getElementById('listenPrompt').style.display = 'none';
+      document.getElementById('cnWord').textContent = current.chinese;
+      answerInput.placeholder = '請輸入英文單字';
+    }
 
     setTimeout(() => document.getElementById('answerInput').focus(), 50);
   }
@@ -556,25 +645,40 @@
   function normalize(s){ return (s||'').trim().toLowerCase(); }
 
   // ---------------- text-to-speech ----------------
-  function speak(text){
+  function speak(text, rate){
     if(!('speechSynthesis' in window) || !text) return;
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'en-US';
-    u.rate = 0.9;
+    u.rate = rate || 0.9;
     speechSynthesis.speak(u);
   }
   // Speak the word, then (after a short pause) the example sentence.
   // cancel() is only called once at the start so the two utterances queue and play in order.
+  // Speak the example sentence first (context), then the word on its own (isolated, clear).
+  // cancel() is only called once at the start so the two utterances queue and play in order.
+  // Post-answer confirmation: word first (clear pronunciation), then the sentence for context.
   function speakWordAndSentence(word, sentence){
     if(!('speechSynthesis' in window)) return;
     try{
       speechSynthesis.cancel();
       if(word) speak(word);
-      if(sentence) speak(sentence);
+      if(sentence) speak(sentence, sentenceRate);
+    }catch(e){}
+  }
+  // Listening-mode question audio: sentence first (context/challenge), then the word in isolation.
+  function speakSentenceThenWord(word, sentence){
+    if(!('speechSynthesis' in window)) return;
+    try{
+      speechSynthesis.cancel();
+      if(sentence) speak(sentence, sentenceRate);
+      if(word) speak(word);
     }catch(e){}
   }
   document.getElementById('speakBtn').addEventListener('click', () => {
     if(current) speakWordAndSentence(current.english, current.sentence);
+  });
+  document.getElementById('playWordBtn').addEventListener('click', () => {
+    if(current) speakSentenceThenWord(current.english, current.sentence);
   });
 
   function diffHtml(userAns, correct){
@@ -630,7 +734,7 @@
       streak++;
       score++;
       fb.className = 'feedback show ok';
-      fb.innerHTML = `🎉 答對了！<b>${current.english}</b>` + showSentence();
+      fb.innerHTML = `🎉 答對了！<b>${current.english}</b>` + (qType==='listen' ? ` (${current.chinese})` : '') + showSentence();
       recordResult(current, true);
       document.getElementById('nextBtn').style.display = 'inline-flex';
       document.getElementById('giveUpBtn').style.display = 'none';
@@ -647,7 +751,7 @@
         wrongThisRound.push(current);
         recordResult(current, false);
         fb.className = 'feedback show bad';
-        fb.innerHTML = `😿 正確答案是 <b>${current.english}</b>` + showSentence();
+        fb.innerHTML = `😿 正確答案是 <b>${current.english}</b>` + (qType==='listen' ? ` (${current.chinese})` : '') + showSentence();
         input.disabled = true;
         document.getElementById('nextBtn').style.display = 'inline-flex';
         document.getElementById('giveUpBtn').style.display = 'none';
@@ -678,7 +782,7 @@
     streak = 0; renderMascot();
     const fb = document.getElementById('feedback');
     fb.className = 'feedback show bad';
-    fb.innerHTML = `答案是 <b>${current.english}</b>，沒關係，下次會記得！` + showSentence();
+    fb.innerHTML = `答案是 <b>${current.english}</b>` + (qType==='listen' ? ` (${current.chinese})` : '') + `，沒關係，下次會記得！` + showSentence();
     document.getElementById('answerInput').disabled = true;
     document.getElementById('nextBtn').style.display = 'inline-flex';
     document.getElementById('giveUpBtn').style.display = 'none';
