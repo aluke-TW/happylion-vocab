@@ -226,6 +226,15 @@
         </div>
       </div>
 
+      <div class="field" id="unitField" style="display:none;">
+        <label>選擇要背的單元（可複選，縮小範圍）</label>
+        <div class="chip-row" id="unitChips"></div>
+        <div class="quick-select-row">
+          <button type="button" class="link-btn" id="selectAllUnitsBtn">全選</button>
+          <button type="button" class="link-btn" id="clearAllUnitsBtn">清除選擇</button>
+        </div>
+      </div>
+
       <div class="field">
         <label>練習模式</label>
         <div class="chip-row">
@@ -362,6 +371,7 @@
   // ---------------- state ----------------
   let API_URL = FIXED_API_URL;
   let bookCounts = {}; // { '14': 265, ... } lightweight, loaded on home screen
+  let bookUnits = {}; // { '14': [{unit:'U1',count:6}, ...], ... } lightweight, loaded on home screen
   let queue = [];
   let qIndex = 0;
   let score = 0;
@@ -373,6 +383,7 @@
   // ---------------- home screen ----------------
   let BOOKS = ['14','15','16']; // fallback until real data loads
   let selectedBooks = new Set();
+  let selectedUnits = new Set(); // subset of the units available across selectedBooks
   let mode = 'normal';
   let qType = 'cn2en'; // 'cn2en' = 看中文拼英文, 'listen' = 聽發音拼英文
   const LS_SENTENCE_RATE = 'hl_sentenceRate';
@@ -388,6 +399,7 @@
       chip.addEventListener('click', () => {
         if(selectedBooks.has(b)) selectedBooks.delete(b); else selectedBooks.add(b);
         renderBookChips();
+        refreshUnitsForBookSelection();
         updateWordCountHint();
       });
       wrap.appendChild(chip);
@@ -397,11 +409,76 @@
   document.getElementById('selectAllBtn').addEventListener('click', () => {
     selectedBooks = new Set(BOOKS);
     renderBookChips();
+    refreshUnitsForBookSelection();
     updateWordCountHint();
   });
   document.getElementById('clearAllBtn').addEventListener('click', () => {
     selectedBooks = new Set();
     renderBookChips();
+    refreshUnitsForBookSelection();
+    updateWordCountHint();
+  });
+
+  // ---------------- unit selection (narrows down within the selected books) ----------------
+  function unitSortKey(unit){
+    const m = String(unit).match(/(\d+)/);
+    return m ? Number(m[1]) : 999;
+  }
+
+  // union of units across all selected books, with counts summed across those books
+  function getAvailableUnits(){
+    const map = {};
+    selectedBooks.forEach(b => {
+      (bookUnits[b] || []).forEach(u => {
+        map[u.unit] = (map[u.unit] || 0) + u.count;
+      });
+    });
+    return Object.keys(map)
+      .sort((a, b) => unitSortKey(a) - unitSortKey(b))
+      .map(unit => ({ unit, count: map[unit] }));
+  }
+
+  // called whenever the book selection changes: rebuilds the unit chip list.
+  // keeps units the user already narrowed down to (if still valid for the new
+  // book selection), otherwise defaults back to "all units" for that selection.
+  function refreshUnitsForBookSelection(){
+    const unitField = document.getElementById('unitField');
+    const available = getAvailableUnits();
+    if(available.length === 0){
+      unitField.style.display = 'none';
+      selectedUnits = new Set();
+    } else {
+      unitField.style.display = '';
+      const stillValid = [...selectedUnits].filter(u => available.some(a => a.unit === u));
+      selectedUnits = stillValid.length ? new Set(stillValid) : new Set(available.map(a => a.unit));
+    }
+    renderUnitChips();
+  }
+
+  function renderUnitChips(){
+    const wrap = document.getElementById('unitChips');
+    wrap.innerHTML = '';
+    getAvailableUnits().forEach(({ unit }) => {
+      const chip = document.createElement('div');
+      chip.className = 'chip' + (selectedUnits.has(unit) ? ' selected' : '');
+      chip.innerHTML = `<span class="dot"></span>${unit}`;
+      chip.addEventListener('click', () => {
+        if(selectedUnits.has(unit)) selectedUnits.delete(unit); else selectedUnits.add(unit);
+        renderUnitChips();
+        updateWordCountHint();
+      });
+      wrap.appendChild(chip);
+    });
+  }
+
+  document.getElementById('selectAllUnitsBtn').addEventListener('click', () => {
+    selectedUnits = new Set(getAvailableUnits().map(u => u.unit));
+    renderUnitChips();
+    updateWordCountHint();
+  });
+  document.getElementById('clearAllUnitsBtn').addEventListener('click', () => {
+    selectedUnits = new Set();
+    renderUnitChips();
     updateWordCountHint();
   });
 
@@ -445,8 +522,18 @@
     } else if(selectedBooks.size === 0){
       hint.textContent = '請至少選擇一個冊別';
     } else {
-      const n = [...selectedBooks].reduce((sum, b) => sum + (bookCounts[b] || 0), 0);
-      hint.textContent = `已選冊別共有 ${n} 個單字`;
+      const available = getAvailableUnits();
+      if(available.length > 0 && selectedUnits.size === 0){
+        hint.textContent = '請至少選擇一個單元';
+      } else if(available.length === 0){
+        const n = [...selectedBooks].reduce((sum, b) => sum + (bookCounts[b] || 0), 0);
+        hint.textContent = `已選範圍共有 ${n} 個單字`;
+      } else {
+        const n = available
+          .filter(u => selectedUnits.has(u.unit))
+          .reduce((sum, u) => sum + u.count, 0);
+        hint.textContent = `已選範圍共有 ${n} 個單字`;
+      }
     }
   }
   document.getElementById('userInput').addEventListener('input', updateWordCountHint);
@@ -454,8 +541,9 @@
   // ---------------- word fetching with local cache ----------------
   const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
-  async function fetchWordsForBooks(books){
-    const key = 'hl_wordcache_' + books.slice().sort().join('-');
+  async function fetchWordsForBooks(books, units){
+    const unitsKeyPart = (units && units.length) ? units.slice().sort().join('-') : 'all';
+    const key = 'hl_wordcache_' + books.slice().sort().join('-') + '__' + unitsKeyPart;
     try{
       const cachedRaw = localStorage.getItem(key);
       if(cachedRaw){
@@ -466,7 +554,11 @@
       }
     }catch(e){}
 
-    const res = await fetch(`${API_URL}?action=getWords&books=${books.join(',')}`);
+    let url = `${API_URL}?action=getWords&books=${books.join(',')}`;
+    if(units && units.length){
+      url += `&units=${units.join(',')}`;
+    }
+    const res = await fetch(url);
     const data = await res.json();
     const words = data.words || [];
     try{
@@ -483,9 +575,13 @@
     try{
       const res = await fetch(`${API_URL}?action=getBooks`);
       const data = await res.json();
-      const found = data.books || []; // [{book, count}, ...]
+      const found = data.books || []; // [{book, count, units:[{unit,count}]}, ...]
       bookCounts = {};
-      found.forEach(b => { bookCounts[b.book] = b.count; });
+      bookUnits = {};
+      found.forEach(b => {
+        bookCounts[b.book] = b.count;
+        bookUnits[b.book] = b.units || [];
+      });
       const foundBooks = found.map(b => b.book);
       if(foundBooks.length){
         BOOKS = foundBooks;
@@ -497,6 +593,7 @@
       return;
     }
     renderBookChips();
+    refreshUnitsForBookSelection();
     document.getElementById('startBtn').disabled = false;
     updateWordCountHint();
   }
@@ -520,12 +617,17 @@
       pool = Object.values(map);
     } else {
       if(selectedBooks.size === 0){ alert('請至少選擇一個冊別'); return; }
+      const available = getAvailableUnits();
+      if(available.length > 0 && selectedUnits.size === 0){ alert('請至少選擇一個單元'); return; }
+      const unitsParam = (available.length > 0 && selectedUnits.size < available.length)
+        ? [...selectedUnits]
+        : null; // null = no narrowing, all units in the selected books
       const startBtn = document.getElementById('startBtn');
       const originalText = startBtn.textContent;
       startBtn.disabled = true;
       startBtn.textContent = '載入單字中…';
       try{
-        pool = await fetchWordsForBooks([...selectedBooks]);
+        pool = await fetchWordsForBooks([...selectedBooks], unitsParam);
       }catch(e){
         alert('無法載入單字，請檢查網路連線後再試一次');
         startBtn.disabled = false;
